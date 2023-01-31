@@ -1,4 +1,3 @@
-# Sqlite3 has Connection class
 from sqlite3 import Connection as SQLite3Connection
 from datetime import datetime
 from sqlalchemy.engine import Engine
@@ -8,6 +7,8 @@ from flask_sqlalchemy import SQLAlchemy
 from linkedlist import LinkedList
 from hashtable import HashTable
 from binarysearchtree import BinarySearchTree
+from custom_q import Queue
+from stack import Stack
 import random
 
 # configure sqlite3 to enforce foreign key constraints
@@ -44,7 +45,7 @@ class BlogPost(db.Model):
     __tablename__ = "blog_post"
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(50))
-    body = db.Column(db.String(500git))
+    body = db.Column(db.String(500))
     date = db.Column(db.Date)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
@@ -136,7 +137,7 @@ def create_blog(user_id):
     return jsonify({"message": "sucessfully created"}), 200
         
 @app.route("/blogs/search/<blog_post_id>", methods=['GET'])
-def get_blog_post(blog_post_id):
+def get_one_blog_post(blog_post_id):
     blog_posts = BlogPost.query.all()
     random.shuffle(blog_posts)
     bst = BinarySearchTree()
@@ -155,6 +156,48 @@ def get_blog_post(blog_post_id):
         return jsonify({"message":"Post Not Found"}), 400
     
     return jsonify(post), 200
+
+@app.route("/blog_post/numeric_body", methods=["GET"])
+def get_numeric_post_bodies():
+    blog_posts = BlogPost.query.all()
+    q = Queue()
+
+    for post in blog_posts:
+        q.enqueue(post)
+    
+    return_list = []
+    for _ in range(len(blog_posts)):
+        post = q.dequeue()
+        numeric_body = 0
+        for char in post.data.body:
+            numeric_body += ord(char)
+        
+        post.data.body = numeric_body
+
+        return_list.append({
+            "id": post.data.id,
+            "title": post.data.title,
+            "body": post.data.body,
+            "user_id": post.data.user_id
+        })
+
+    return jsonify(return_list), 200
+
+@app.route("/blog_post/delete_last_10", methods=['DELETE'])
+def delete_last_10():
+    blog_posts = BlogPost.query.all()
+
+    s = Stack()
+    for post in blog_posts:
+        s.push(post)
+    
+    for _ in range(10):
+        post_to_delete = s.pop()
+        db.session.delete(post_to_delete.data)
+        db.session.commit()
+    return jsonify({"message":"Success"}), 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=3000)
